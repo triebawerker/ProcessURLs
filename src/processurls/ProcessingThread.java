@@ -23,20 +23,12 @@ import java.util.UUID;
  * @author alexander.oldemeier
  */
 class ProcessingThread implements Runnable {
-   
-    class ImageInRedis {
-        
-        public String url; 
-        public double[] ceddFeatures;
-        public double[] gaborFeatures;
-        
-    }
     
     private static Logger logger = Logger.getRootLogger();
     
     Thread t = null;
     UUID guid = null;
-    ArrayList<String> URLs = null;
+    ArrayList<YategoImage> sourceData = null;
     LSHCeddExtractor ceddExtractor = new LSHCeddExtractor();
     LSHGaborExtractor gaborExtractor = new LSHGaborExtractor();
     String basePath = null;
@@ -45,10 +37,10 @@ class ProcessingThread implements Runnable {
     
     static Boolean accessFlag = false;
     
-    ProcessingThread(ArrayList<String> myURLs, String myBasePath, String myRedisConnectionString) {
+    ProcessingThread(ArrayList<YategoImage> mySourceData, String myBasePath, String myRedisConnectionString) {
 
         guid = UUID.randomUUID();
-        URLs = myURLs;
+        sourceData = mySourceData;
         basePath = myBasePath;
         redisConnectionString = myRedisConnectionString;
         
@@ -60,16 +52,15 @@ class ProcessingThread implements Runnable {
 
     }
    
-    private void processURL(String url, String basePath) {
+    private void processURL(YategoImage sourceData, String basePath) {
         
-        logger.debug("Processing: " + url + "...");
+        logger.debug("Processing: " + sourceData.imageURL + "...");
         
         try {
         
             ImageInImageSpace img = new ImageInImageSpace();
 
-            img.initializeImageFromURL(url);
-            
+            img.initializeImageFromURL(sourceData.imageURL);           
             
             img.setExtractor(ceddExtractor);
             img.saveImageMetaDataToFile(basePath + "iisCEDD/" + img.getUUID().toString() + ".iis");            
@@ -77,20 +68,18 @@ class ProcessingThread implements Runnable {
             img.setExtractor(gaborExtractor);
             img.saveImageMetaDataToFile(basePath + "iisGabor/" + img.getUUID().toString() + ".iis");
 
-
-            ImageInRedis myImage = new ImageInRedis();
-
-            myImage.url = img.getURL();
-            myImage.ceddFeatures = img.getCeddDescriptorVectorDouble();
-            myImage.gaborFeatures = img.getGaborDescriptorVectorDouble();
-
+            sourceData.ceddFeatureVector = img.getCeddDescriptorVectorDouble();
+            sourceData.fcthFeatureVector = img.getFCTHDescriptorVectorDouble();
+            sourceData.gaborFeatureVector = img.getGaborDescriptorVectorDouble();
+            sourceData.tamuraFeatureVector = img.getTamuraDescriptorVectorDouble();
+            
             ObjectMapper mapper = new ObjectMapper();
 
-            jedis.hset("images", img.getUUID().toString(), mapper.writeValueAsString(myImage));
+            jedis.hset("images", img.getUUID().toString(), mapper.writeValueAsString(sourceData));
 
         } catch (Exception e) {
             
-            logger.error("Processing " + url + " failed with exception: " + e.getMessage());
+            logger.error("Processing " + sourceData.imageURL + " failed with exception: " + e.getMessage());
             
         }
   
@@ -98,25 +87,25 @@ class ProcessingThread implements Runnable {
 
    public void run() {
      
-     while (!URLs.isEmpty()) {
+     while (!sourceData.isEmpty()) {
      
-         String nextURL = null;
+         YategoImage nextImage = null;
          
          synchronized(ProcessingThread.class) {
             
              if(accessFlag == false) {
 
                accessFlag = true;
-               nextURL = URLs.get(0);
-               URLs.remove(0);
+               nextImage = sourceData.get(0);
+               sourceData.remove(0);
                accessFlag = false;
 
             }
          
          }
          
-         if (nextURL != null) {
-            processURL(nextURL, basePath);
+         if (nextImage != null) {
+            processURL(nextImage, basePath);
          }
          
      }

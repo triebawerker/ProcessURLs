@@ -57,21 +57,21 @@ public class ProcessURLs {
         
     }
 
-    private static void processURLs(ArrayList<String> urls, String basePath, String redisConnectionString) {
+    private static void processURLs(ArrayList<YategoImage> images, String basePath, String redisConnectionString) {
         
-        logger.info("Now processing " + urls.size() + " URLs...");
+        logger.info("Now processing " + images.size() + " images...");
                 
         ProcessingThread[] processingThreads = new ProcessingThread[NUM_THREADS];
         
         for (int i=0;i<NUM_THREADS;i++) {
             
-            processingThreads[i] = new ProcessingThread(urls, basePath, redisConnectionString);
+            processingThreads[i] = new ProcessingThread(images, basePath, redisConnectionString);
             
         }
         
         try {
             
-         while(!urls.isEmpty()) {
+         while(!images.isEmpty()) {
              
            Thread.sleep(1000);
          
@@ -104,9 +104,9 @@ public class ProcessURLs {
         
     }
     
-    private static ArrayList<String> getURLArrayListFromFileSource(String fileName) throws IOException {
+    private static ArrayList<YategoImage> getURLArrayListFromFileSource(String fileName) throws IOException {
 
-        ArrayList<String> retval = new ArrayList();
+        ArrayList<YategoImage> retval = new ArrayList();
 
         FileInputStream fstream = new FileInputStream(fileName);
         DataInputStream in = new DataInputStream(fstream);
@@ -120,7 +120,12 @@ public class ProcessURLs {
             if (strLine.startsWith("http://")
                     && (strLine.endsWith(".jpg") || strLine.endsWith(".JPG") || strLine.endsWith(".jpeg")
                     || strLine.endsWith(".png") || strLine.endsWith(".gif"))) {
-                retval.add(strLine);
+                
+                YategoImage image = new YategoImage();
+                image.imageURL = strLine;
+                
+                retval.add(image);
+                
             } else {
                 //System.out.println("Not processing line because it is not a URL.");
             }
@@ -134,12 +139,12 @@ public class ProcessURLs {
 
     }
     
-    private static ArrayList<String> getURLArrayListFromSQLSource(String connectionString) throws SQLException {       
+    private static ArrayList<YategoImage> getURLArrayListFromSQLSource(String connectionString) throws SQLException {       
         
         Connection connect = null;
         Statement statement = null;
         ResultSet resultSet = null;
-        ArrayList<String> retval = new ArrayList();
+        ArrayList<YategoImage> retval = new ArrayList();
   
         try {
             
@@ -156,16 +161,15 @@ public class ProcessURLs {
             
             while (resultSet.next()) {
                 
-              String imageURL = resultSet.getString("picture");
-              String productURL = resultSet.getString("article_url");
-              String categoryLevelOne = resultSet.getString("category_level_one");
-              String categoryLevelTwo = resultSet.getString("category_level_two");
-              String categoryLevelThree = resultSet.getString("category_level_three");
-
-              String sourceDataString = imageURL + "," + productURL + "," +
-                      categoryLevelOne + "," + categoryLevelTwo + "," + categoryLevelThree;
+              YategoImage image = new YategoImage();
+                
+              image.imageURL = resultSet.getString("picture");
+              image.productURL = resultSet.getString("article_url");
+              image.category_level_one = resultSet.getString("category_level_one");
+              image.category_level_two = resultSet.getString("category_level_two");
+              image.category_level_three = resultSet.getString("category_level_three");             
                       
-              retval.add(sourceDataString);
+              retval.add(image);
             
             }
         } catch (Exception e) {
@@ -208,7 +212,7 @@ public class ProcessURLs {
             
             startMeasureTime();
             
-            ArrayList<String> imageSourceData = new ArrayList();
+            ArrayList<YategoImage> imageSourceData = new ArrayList();
             
             if (sourceName.startsWith("jdbc:mysql://")) {
             

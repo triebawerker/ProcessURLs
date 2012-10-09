@@ -155,7 +155,7 @@ public class ProcessURLs {
 
             resultSet = statement.executeQuery("SELECT picture,article_url,"
                     + "category_level_one,category_level_two,category_level_three"
-                    + " FROM yatego.product_feed_articles LIMIT 10");
+                    + " FROM yatego.product_feed_articles");
 
             ArrayList<String> catOne = new ArrayList();
 

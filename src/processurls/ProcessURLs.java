@@ -139,52 +139,52 @@ public class ProcessURLs {
 
     }
 
-    private static ArrayList<YategoImage> getURLArrayListFromSQLSource(String connectionString) throws SQLException {
+    private static ArrayList<YategoImage> getURLArrayListFromSQLSource(String connectionString, int start, int limit) throws SQLException {
 
-        Connection connect = null;
-        Statement statement = null;
-        ResultSet resultSet = null;
-        ArrayList<YategoImage> retval = new ArrayList();
+      Connection connect = null;
+      Statement statement = null;
+      ResultSet resultSet = null;
+      ArrayList<YategoImage> retval = new ArrayList();
 
-        try {
+      try {
+          Class.forName("com.mysql.jdbc.Driver");
+          connect = DriverManager.getConnection(connectionString);
 
-            Class.forName("com.mysql.jdbc.Driver");
-            connect = DriverManager.getConnection(connectionString);
+          statement = connect.createStatement();
 
-            statement = connect.createStatement();
+          resultSet = statement.executeQuery("SELECT picture,article_url,"
+                  + "category_level_one,category_level_two,category_level_three"
+                  + " FROM yatego.product_feed_articles LIMIT "
+                  + start + "," + limit);
 
-            resultSet = statement.executeQuery("SELECT picture,article_url,"
-                    + "category_level_one,category_level_two,category_level_three"
-                    + " FROM yatego.product_feed_articles");
+          ArrayList<String> catOne = new ArrayList();
 
-            ArrayList<String> catOne = new ArrayList();
+          while (resultSet.next()) {
 
-            while (resultSet.next()) {
+            YategoImage image = new YategoImage();
 
-              YategoImage image = new YategoImage();
+            image.imageURL = resultSet.getString("picture");
+            image.productURL = resultSet.getString("article_url");
+            image.category_level_one = resultSet.getString("category_level_one");
+            image.category_level_two = resultSet.getString("category_level_two");
+            image.category_level_three = resultSet.getString("category_level_three");
 
-              image.imageURL = resultSet.getString("picture");
-              image.productURL = resultSet.getString("article_url");
-              image.category_level_one = resultSet.getString("category_level_one");
-              image.category_level_two = resultSet.getString("category_level_two");
-              image.category_level_three = resultSet.getString("category_level_three");
+            retval.add(image);
+          }
 
-              retval.add(image);
+      } catch (Exception e) {
 
-            }
-        } catch (Exception e) {
+        logger.error("Exception while reading from SQL database: " + e.getMessage());
 
-            logger.error("Exception while reading from SQL database: " + e.getMessage());
+      } finally {
 
-        } finally {
+        connect.close();
+        statement.close();
+        resultSet.close();
 
-            connect.close();
-            statement.close();
-            resultSet.close();
+      }
 
-        }
-
-        return retval;
+      return retval;
 
     }
 
@@ -193,50 +193,57 @@ public class ProcessURLs {
      */
     public static void main(String[] args) {
 
-        if (args.length != 3) {
-            System.out.println("processurls url_file_path processed_images_path redis_connection_string");
-            return;
+      if (args.length != 3) {
+        System.out.println("processurls url_file_path processed_images_path redis_connection_string");
+        return;
+      }
+
+      String sourceName = args[0];
+      String basePath = args[1];
+      String redisConnectionString = args[2];
+
+      initLogger();
+
+      logger.info("Processing URLs from: " + sourceName);
+
+      int start = 0;
+      int limit = 20000;
+      int total = 1468090; // total1468090
+
+      for (int i = 0; i <= total; i += limit) {
+
+        try {
+          logger.info("Extracting URLs...");
+
+          startMeasureTime();
+
+          ArrayList<YategoImage> imageSourceData = new ArrayList();
+
+          if (sourceName.startsWith("jdbc:mysql:")) {
+
+            imageSourceData = getURLArrayListFromSQLSource(sourceName, start, limit);
+
+          } else {
+
+            imageSourceData = getURLArrayListFromFileSource(sourceName);
+
+          }
+
+          printElapsedTime();
+
+          startMeasureTime();
+
+          processURLs(imageSourceData, basePath, redisConnectionString);
+
+          printElapsedTime();
+
+        } catch (Exception e) {
+
+          logger.error("Exception in main: " + e.getMessage());
+
         }
-
-        String sourceName = args[0];
-        String basePath = args[1];
-        String redisConnectionString = args[2];
-
-        initLogger();
-
-        logger.info("Processing URLs from: " + sourceName);
-
-        try{
-
-            logger.info("Extracting URLs...");
-
-            startMeasureTime();
-
-            ArrayList<YategoImage> imageSourceData = new ArrayList();
-
-            if (sourceName.startsWith("jdbc:mysql:")) {
-
-                imageSourceData = getURLArrayListFromSQLSource(sourceName);
-
-            } else {
-
-                imageSourceData = getURLArrayListFromFileSource(sourceName);
-
-            }
-
-            printElapsedTime();
-
-            startMeasureTime();
-
-            processURLs(imageSourceData, basePath, redisConnectionString);
-
-            printElapsedTime();
-
-        }catch (Exception e){
-
-            logger.error("Exception in main: " + e.getMessage());
-
-        }
+        start += limit;
+      }
 
     }
 }

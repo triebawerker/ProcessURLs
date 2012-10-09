@@ -1,0 +1,6 @@
+INFO - Processing URLs from: jdbc:mysql://172.19.1.61/yatego?user=admin&password=micha
+INFO - Extracting URLs...
+ERROR - Exception while reading from SQL database: Communications link failure
+
+The last packet sent successfully to the server was 0 milliseconds ago. The driver has not received any packets from the server.
+ERROR - Exception in main: null
